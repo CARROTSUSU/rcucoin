@@ -22,9 +22,7 @@ func NewRCUCoinApp() *RCUCoinApp {
 }
 
 func (app *RCUCoinApp) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
-	return abcitypes.ResponseInfo{
-		Data: "RCUCoin ABCI App",
-	}
+	return abcitypes.ResponseInfo{Data: "RCUCoin ABCI App"}
 }
 
 func (app *RCUCoinApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
@@ -46,5 +44,7 @@ func (app *RCUCoinApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.Respo
 	app.balances[tx.From] -= tx.Amount
 	app.balances[tx.To] += tx.Amount
 
-	return abcitypes.ResponseDeliverTx{Code: 0, Log: "Transfer success"}
+	fmt.Printf("Transfer %d from %s to %s\n", tx.Amount, tx.From, tx.To)
+
+	return abcitypes.ResponseDeliverTx{Code: 0, Log: "Success"}
 }
