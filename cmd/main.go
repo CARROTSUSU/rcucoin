@@ -4,7 +4,6 @@ import (
 	"log"
 
 	"github.com/tendermint/tendermint/abci/server"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/ceocarrotsusu/rcucoin/abci"
 )
 
@@ -16,7 +15,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv.Start()
+	if err := srv.Start(); err != nil {
+		log.Fatal(err)
+	}
+
 	defer srv.Stop()
 	select {}
 }
