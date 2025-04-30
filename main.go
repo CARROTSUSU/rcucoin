@@ -88,10 +88,7 @@ func (app *RcpuCoinApp) Info(req abci.RequestInfo) abci.ResponseInfo {
 func main() {
     app := NewRcpuCoinApp()
 
-    srv, err := server.NewSocketServer("tcp://0.0.0.0:26658", app)
-    if err != nil {
-        log.Fatalf("Error creating ABCI server: %v", err)
-    }
+    srv := server.NewSocketServer(":26658", app)
 
     if err := srv.Start(); err != nil {
         log.Fatalf("Failed to start ABCI server: %v", err)
