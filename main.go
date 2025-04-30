@@ -4,92 +4,69 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 
-	"github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/service"
+	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/abci/server"
 )
 
-// Struktur aplikasi RCUCoin
-type RCUCoinApp struct {
-	types.BaseApplication
-	balances map[string]int64 // Gunakan int64 untuk unit mikro (Miroc)
+const MirocPerRCU = 1_000_000
+
+type RcuCoinApp struct {
+	abci.BaseApplication
+	balances map[string]int64 // simpan dalam unit Miroc
 }
 
-// Unit minimum
-const Unit = 1_000_000 // 1 RCUCoin = 1,000,000 Miroc
-
-// Cipta aplikasi
-func NewRCUCoinApp() *RCUCoinApp {
-	return &RCUCoinApp{
+func NewRcuCoinApp() *RcuCoinApp {
+	return &RcuCoinApp{
 		balances: map[string]int64{
-			"address1": 10 * Unit, // 10 RCU
-			"address2": 5 * Unit,  // 5 RCU
+			"address1": 10 * MirocPerRCU, // 10 RCUCoin
+			"address2": 5 * MirocPerRCU,  // 5 RCUCoin
 		},
 	}
 }
 
-// Terima transaksi
-func (app *RCUCoinApp) DeliverTx(req types.RequestDeliverTx) types.ResponseDeliverTx {
-	var tx struct {
-		From   string `json:"from"`
-		To     string `json:"to"`
-		Amount int64  `json:"amount"` // dalam Miroc
-	}
-	err := json.Unmarshal(req.Tx, &tx)
+type TransferTx struct {
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Amount int64  `json:"amount"` // dalam Miroc
+}
+
+func (app *RcuCoinApp) DeliverTx(tx []byte) abci.ResponseDeliverTx {
+	var t TransferTx
+	err := json.Unmarshal(tx, &t)
 	if err != nil {
-		return types.ResponseDeliverTx{Code: 1, Log: "Invalid transaction format"}
+		return abci.ResponseDeliverTx{Code: 1, Log: fmt.Sprintf("Decode error: %v", err)}
 	}
 
-	if app.balances[tx.From] < tx.Amount {
-		return types.ResponseDeliverTx{Code: 2, Log: "Insufficient balance"}
+	if t.Amount <= 0 {
+		return abci.ResponseDeliverTx{Code: 1, Log: "Invalid amount"}
 	}
 
-	app.balances[tx.From] -= tx.Amount
-	app.balances[tx.To] += tx.Amount
+	if app.balances[t.From] < t.Amount {
+		return abci.ResponseDeliverTx{Code: 1, Log: "Insufficient balance"}
+	}
 
-	fmt.Printf("Transferred %d Miroc from %s to %s\n", tx.Amount, tx.From, tx.To)
-	return types.ResponseDeliverTx{Code: 0, Log: "Transaction successful"}
+	app.balances[t.From] -= t.Amount
+	app.balances[t.To] += t.Amount
+
+	logStr := fmt.Sprintf("Transfer %d Miroc (%.6f RCU) from %s to %s",
+		t.Amount, float64(t.Amount)/float64(MirocPerRCU), t.From, t.To)
+
+	return abci.ResponseDeliverTx{Code: 0, Log: logStr}
 }
 
-// Info aplikasi
-func (app *RCUCoinApp) Info(req types.RequestInfo) types.ResponseInfo {
-	return types.ResponseInfo{
-		Data:             "RCUCoin ABCI",
-		AppVersion:       1,
-		LastBlockHeight:  0,
-		LastBlockAppHash: []byte{},
-	}
+func (app *RcuCoinApp) Info(req abci.RequestInfo) abci.ResponseInfo {
+	return abci.ResponseInfo{Data: "RCUCoin Miroc Blockchain"}
 }
 
-// Fungsi utama
 func main() {
-	app := NewRCUCoinApp()
-
-	srv, err := server.NewSocketServer("tcp://127.0.0.1:26658", app)
-	if err != nil {
-		log.Fatalf("Error creating server: %v", err)
-	}
-	srv.SetLogger(log.New(os.Stdout, "", log.LstdFlags))
-
-	// Signal trap (ganti cli.TrapSignal)
-	go func() {
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-		<-c
-		fmt.Println("Shutting down ABCI server...")
-		if err := srv.Stop(); err != nil {
-			log.Fatalf("Error stopping server: %v", err)
-		}
-	}()
+	app := NewRcuCoinApp()
+	srv := server.NewSocketServer("tcp://127.0.0.1:26658", app)
 
 	if err := srv.Start(); err != nil {
-		log.Fatalf("Error starting ABCI server: %v", err)
+		log.Fatalf("Failed to start ABCI server: %v", err)
 	}
+	defer srv.Stop()
 
-	// Biarkan terus jalan
-	select {}
+	select {} // keep running
 }
