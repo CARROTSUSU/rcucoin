@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	abcitypes "github.com/tendermint/tendermint/abci/types"
+	abci "github.com/tendermint/tendermint/abci/types"
 )
 
 const MirocPerRCU = 1_000_000
