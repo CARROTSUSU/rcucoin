@@ -76,13 +76,17 @@ func (app *RcpuCoinApp) CheckTx(tx abci.RequestCheckTx) abci.ResponseCheckTx {
     return abci.ResponseCheckTx{Code: 0}
 }
 
-func (app *RcpuCoinApp) Info(req abci.RequestInfo) abci.ResponseInfo {
-    return abci.ResponseInfo{
-        Data:             "RCUCoin ABCI",
-        AppVersion:       1,
-        LastBlockHeight:  0,
-        LastBlockAppHash: []byte(""),
+func (app *RcpuCoinApp) Info(req types.RequestInfo) types.ResponseInfo {
+    // Menyediakan maklumat aplikasi, termasuk hash blok terkini
+    blockInfo := types.ResponseInfo{
+        Data:            "RCUCOIN Blockchain",
+        Validators:      []types.Validator{},
+        LatestBlockHash: []byte("hash-blok-sebelum"),
+        LatestAppHash:   []byte("hash-aplikasi-sebelum"),
     }
+    // Hash blok terkini yang akan ditetapkan selepas transaksi berlaku
+    blockInfo.LatestBlockHash = app.latestBlockHash  // Dapatkan nilai daripada keadaan terkini
+    return blockInfo
 }
 
 func main() {
