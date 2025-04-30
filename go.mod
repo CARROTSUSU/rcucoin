@@ -1,4 +1,4 @@
-module github.com/ceocarrotsusu/rcucoin
+module github.com/CARROTSUSU/rcucoin
 
 go 1.20
 
