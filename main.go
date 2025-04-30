@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"github.com/tendermint/tendermint/abci/types"
-	"github.com/tendermint/tendermint/libs/json"
-	"github.com/tendermint/tendermint/libs/bytes"
+	"abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
+	"github.com/tendermint/tendermint/abci/server"
 )
 
 // Struktur aplikasi RcpuCoin
