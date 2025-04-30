@@ -4,7 +4,7 @@ import (
     "log"
     "github.com/tendermint/tendermint/abci/server"
     "github.com/tendermint/tendermint/libs/cli"
-    "github.com/username/rcucoin/abci"
+    "github.com/CARROTSUSU/rcucoin/abci"
 )
 
 func main() {
