@@ -1,48 +1,50 @@
 package abci
 
 import (
-    "encoding/json"
-    "fmt"
-    abcitypes "github.com/tendermint/tendermint/abci/types"
+	"encoding/json"
+	"fmt"
+
+	abcitypes "github.com/tendermint/tendermint/abci/types"
 )
 
 type RCUCoinApp struct {
-    abcitypes.BaseApplication
-    balances map[string]int64 // simpan dalam Miroc
+	abcitypes.BaseApplication
+	balances map[string]int64
 }
 
 func NewRCUCoinApp() *RCUCoinApp {
-    return &RCUCoinApp{
-        balances: map[string]int64{
-            "address1": 5_000_000_000, // 5,000 RCU = 5B Miroc
-            "address2": 2_000_000_000,
-        },
-    }
+	return &RCUCoinApp{
+		balances: map[string]int64{
+			"rcu1": 1000000,
+			"rcu2": 500000,
+		},
+	}
 }
 
-func (app *RCUCoinApp) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
-    return abcitypes.ResponseInfo{Data: "RCUCoin (Miroc-based)"}
+type Tx struct {
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Amount int64  `json:"amount"` // dalam unit Miroc (1 RCU = 1,000,000 Miroc)
 }
 
 func (app *RCUCoinApp) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-    var tx struct {
-        From  string `json:"from"`
-        To    string `json:"to"`
-        Miroc int64  `json:"miroc"` // dalam Miroc
-    }
+	var tx Tx
+	if err := json.Unmarshal(req.Tx, &tx); err != nil {
+		return abcitypes.ResponseDeliverTx{Code: 1, Log: "Invalid TX format"}
+	}
 
-    if err := json.Unmarshal(req.Tx, &tx); err != nil {
-        return abcitypes.ResponseDeliverTx{Code: 1, Log: "Invalid JSON"}
-    }
+	if app.balances[tx.From] < tx.Amount {
+		return abcitypes.ResponseDeliverTx{Code: 1, Log: "Insufficient funds"}
+	}
 
-    if tx.Miroc <= 0 || app.balances[tx.From] < tx.Miroc {
-        return abcitypes.ResponseDeliverTx{Code: 1, Log: "Invalid or insufficient balance"}
-    }
+	app.balances[tx.From] -= tx.Amount
+	app.balances[tx.To] += tx.Amount
 
-    app.balances[tx.From] -= tx.Miroc
-    app.balances[tx.To] += tx.Miroc
+	return abcitypes.ResponseDeliverTx{Code: 0, Log: "Transaction successful"}
+}
 
-    fmt.Printf("Transferred %d Miroc from %s to %s\n", tx.Miroc, tx.From, tx.To)
-
-    return abcitypes.ResponseDeliverTx{Code: 0, Log: "Success"}
+func (app *RCUCoinApp) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
+	return abcitypes.ResponseInfo{
+		Data: "RCUCoin v1.0",
+	}
 }
