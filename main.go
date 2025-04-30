@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"abci "github.com/tendermint/tendermint/abci/types"
+	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/log"
 	"github.com/tendermint/tendermint/abci/server"
 )
