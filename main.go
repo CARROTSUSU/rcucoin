@@ -96,4 +96,5 @@ func main() {
 
     defer srv.Stop()
     log.Println("ABCI server running on port 26658")
+    select {}
 }
