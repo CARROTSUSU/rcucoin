@@ -39,8 +39,8 @@ func (app *RcpuCoinApp) LoadState() {
     data, err := os.ReadFile("state.json")
     if err != nil {
         log.Println("Tiada state.json, mula dari kosong")
-        app.balances["address1"] = 1000
-        app.balances["address2"] = 500
+        app.balances["9758A0E9A531642AE9E781BBDCE8F1298501298501BFFB"] = 1000
+        app.balances["FC8EA6FB4A04F93845D2F8E8E6ED63F698965499"] = 500
         return
     }
 
