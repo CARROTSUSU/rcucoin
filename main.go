@@ -16,6 +16,7 @@ type AppState struct {
     Balances        map[string]int `json:"balances"`
     LatestAppHash   string         `json:"latest_app_hash"`
     LatestBlockHash string         `json:"latest_block_hash"`
+    LastBlockHeight int64          `json:"last_block_height"`
 }
 
 type RcpuCoinApp struct {
@@ -23,6 +24,7 @@ type RcpuCoinApp struct {
     balances        map[string]int
     latestAppHash   []byte
     latestBlockHash []byte
+    lastBlockHeight int64
 }
 
 func NewRcpuCoinApp() *RcpuCoinApp {
@@ -30,6 +32,7 @@ func NewRcpuCoinApp() *RcpuCoinApp {
         balances:        make(map[string]int),
         latestAppHash:   []byte{},
         latestBlockHash: []byte{},
+        lastBlockHeight: 0,
     }
     app.LoadState()
     return app
@@ -53,6 +56,7 @@ func (app *RcpuCoinApp) LoadState() {
     app.balances = state.Balances
     app.latestAppHash, _ = hex.DecodeString(state.LatestAppHash)
     app.latestBlockHash, _ = hex.DecodeString(state.LatestBlockHash)
+    app.lastBlockHeight = state.LastBlockHeight
     log.Println("Berjaya load state.json")
 }
 
@@ -61,6 +65,7 @@ func (app *RcpuCoinApp) saveState() {
         Balances:        app.balances,
         LatestAppHash:   hex.EncodeToString(app.latestAppHash),
         LatestBlockHash: hex.EncodeToString(app.latestBlockHash),
+        LastBlockHeight: app.lastBlockHeight,
     }
 
     data, err := json.MarshalIndent(state, "", "  ")
@@ -127,11 +132,11 @@ func (app *RcpuCoinApp) CheckTx(tx abci.RequestCheckTx) abci.ResponseCheckTx {
 }
 
 func (app *RcpuCoinApp) Commit() abci.ResponseCommit {
-    // Simpan hash semasa berdasarkan balances
     balancesBytes, _ := json.Marshal(app.balances)
     hash := sha256.Sum256(balancesBytes)
     app.latestAppHash = hash[:]
     app.latestBlockHash = hash[:]
+    app.lastBlockHeight++
 
     app.saveState()
 
@@ -140,9 +145,9 @@ func (app *RcpuCoinApp) Commit() abci.ResponseCommit {
 
 func (app *RcpuCoinApp) Info(req abci.RequestInfo) abci.ResponseInfo {
     return abci.ResponseInfo{
-        Data:            "RCUCOIN Blockchain ABCI",
-        LatestAppHash:   app.latestAppHash,
-        LastBlockHeight: 1,
+        Data:             "RCUCOIN Blockchain ABCI",
+        LastBlockHeight:  app.lastBlockHeight,
+        LastBlockAppHash: app.latestAppHash,
     }
 }
 
