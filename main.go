@@ -1,112 +1,160 @@
 package main
 
 import (
+    "crypto/sha256"
+    "encoding/hex"
     "encoding/json"
     "fmt"
     "log"
+    "os"
 
     abci "github.com/tendermint/tendermint/abci/types"
     "github.com/tendermint/tendermint/abci/server"
 )
 
-type RcpuCoinApp struct {
-    abci.BaseApplication
-    balances         map[string]int
-    latestAppHash    []byte
-    latestBlockHash  []byte
+type AppState struct {
+    Balances        map[string]int `json:"balances"`
+    LatestAppHash   string         `json:"latest_app_hash"`
+    LatestBlockHash string         `json:"latest_block_hash"`
 }
 
-// Fungsi untuk cipta aplikasi baru
+type RcpuCoinApp struct {
+    abci.BaseApplication
+    balances        map[string]int
+    latestAppHash   []byte
+    latestBlockHash []byte
+}
+
 func NewRcpuCoinApp() *RcpuCoinApp {
     app := &RcpuCoinApp{
-        balances:         make(map[string]int),
-        latestAppHash:    []byte("genesis-app-hash"),
-        latestBlockHash:  []byte("genesis-block-hash"),
+        balances:        make(map[string]int),
+        latestAppHash:   []byte{},
+        latestBlockHash: []byte{},
     }
-
-    // Baki permulaan untuk dua alamat (anda boleh ganti dengan alamat sebenar)
-    app.balances["rcpu9758A0E9A531642AE9E781BBDCE8F1298501BFFB"] = 1000
-    app.balances["rcpuFC8EA6FB4A04F93845D2F8E8E6ED63F698965499"] = 500
-
+    app.LoadState()
     return app
 }
 
-// Inisialisasi rantai (jika perlu baca validator atau maklumat permulaan lain)
-func (app *RcpuCoinApp) InitChain(req abci.RequestInitChain) abci.ResponseInitChain {
-    fmt.Println("Chain initialized with genesis")
-    return abci.ResponseInitChain{}
+func (app *RcpuCoinApp) LoadState() {
+    data, err := os.ReadFile("state.json")
+    if err != nil {
+        log.Println("Tiada state.json, mula dari kosong")
+        app.balances["address1"] = 1000
+        app.balances["address2"] = 500
+        return
+    }
+
+    var state AppState
+    if err := json.Unmarshal(data, &state); err != nil {
+        log.Println("Gagal parse state.json:", err)
+        return
+    }
+
+    app.balances = state.Balances
+    app.latestAppHash, _ = hex.DecodeString(state.LatestAppHash)
+    app.latestBlockHash, _ = hex.DecodeString(state.LatestBlockHash)
+    log.Println("Berjaya load state.json")
 }
 
-// Semak transaksi sebelum ia dihantar ke blok
-func (app *RcpuCoinApp) CheckTx(req abci.RequestCheckTx) abci.ResponseCheckTx {
-    var tx struct {
+func (app *RcpuCoinApp) saveState() {
+    state := AppState{
+        Balances:        app.balances,
+        LatestAppHash:   hex.EncodeToString(app.latestAppHash),
+        LatestBlockHash: hex.EncodeToString(app.latestBlockHash),
+    }
+
+    data, err := json.MarshalIndent(state, "", "  ")
+    if err != nil {
+        log.Println("Gagal serialize state:", err)
+        return
+    }
+
+    _ = os.WriteFile("state.json", data, 0644)
+    log.Println("State disimpan ke state.json")
+}
+
+func (app *RcpuCoinApp) DeliverTx(tx abci.RequestDeliverTx) abci.ResponseDeliverTx {
+    var transfer struct {
         From   string `json:"from"`
         To     string `json:"to"`
         Amount int    `json:"amount"`
     }
 
-    if err := json.Unmarshal(req.Tx, &tx); err != nil {
-        return abci.ResponseCheckTx{Code: 1, Log: fmt.Sprintf("Invalid tx format: %v", err)}
+    if err := json.Unmarshal(tx.Tx, &transfer); err != nil {
+        return abci.ResponseDeliverTx{
+            Code: 1,
+            Log:  fmt.Sprintf("Gagal decode tx: %v", err),
+        }
     }
 
-    if app.balances[tx.From] < tx.Amount {
-        return abci.ResponseCheckTx{Code: 1, Log: "Insufficient balance"}
+    if app.balances[transfer.From] < transfer.Amount {
+        return abci.ResponseDeliverTx{
+            Code: 1,
+            Log:  "Baki tidak mencukupi",
+        }
+    }
+
+    app.balances[transfer.From] -= transfer.Amount
+    app.balances[transfer.To] += transfer.Amount
+
+    log.Printf("Pindahan %d RCU dari %s ke %s", transfer.Amount, transfer.From, transfer.To)
+
+    return abci.ResponseDeliverTx{Code: 0, Log: "Pindahan berjaya"}
+}
+
+func (app *RcpuCoinApp) CheckTx(tx abci.RequestCheckTx) abci.ResponseCheckTx {
+    var transfer struct {
+        From   string `json:"from"`
+        To     string `json:"to"`
+        Amount int    `json:"amount"`
+    }
+
+    if err := json.Unmarshal(tx.Tx, &transfer); err != nil {
+        return abci.ResponseCheckTx{
+            Code: 1,
+            Log:  fmt.Sprintf("Gagal decode tx: %v", err),
+        }
+    }
+
+    if app.balances[transfer.From] < transfer.Amount {
+        return abci.ResponseCheckTx{
+            Code: 1,
+            Log:  "Baki tidak mencukupi",
+        }
     }
 
     return abci.ResponseCheckTx{Code: 0}
 }
 
-// Laksanakan transaksi sebenar dan kemas kini baki
-func (app *RcpuCoinApp) DeliverTx(req abci.RequestDeliverTx) abci.ResponseDeliverTx {
-    var tx struct {
-        From   string `json:"from"`
-        To     string `json:"to"`
-        Amount int    `json:"amount"`
-    }
+func (app *RcpuCoinApp) Commit() abci.ResponseCommit {
+    // Simpan hash semasa berdasarkan balances
+    balancesBytes, _ := json.Marshal(app.balances)
+    hash := sha256.Sum256(balancesBytes)
+    app.latestAppHash = hash[:]
+    app.latestBlockHash = hash[:]
 
-    if err := json.Unmarshal(req.Tx, &tx); err != nil {
-        return abci.ResponseDeliverTx{Code: 1, Log: fmt.Sprintf("Invalid tx format: %v", err)}
-    }
+    app.saveState()
 
-    if app.balances[tx.From] < tx.Amount {
-        return abci.ResponseDeliverTx{Code: 1, Log: "Insufficient balance"}
-    }
-
-    app.balances[tx.From] -= tx.Amount
-    app.balances[tx.To] += tx.Amount
-
-    // Simpan app hash
-    app.latestAppHash = []byte(fmt.Sprintf("apphash-%s-%s-%d", tx.From, tx.To, tx.Amount))
-
-    fmt.Printf("Transferred %d RCU from %s to %s\n", tx.Amount, tx.From, tx.To)
-    return abci.ResponseDeliverTx{Code: 0, Log: "Transfer successful"}
+    return abci.ResponseCommit{Data: app.latestAppHash}
 }
 
-// Maklumat blok semasa & aplikasi
 func (app *RcpuCoinApp) Info(req abci.RequestInfo) abci.ResponseInfo {
     return abci.ResponseInfo{
-        Data:              "RCUCOIN Blockchain",
-        LastBlockHeight:   1,
-        LastBlockAppHash:  app.latestAppHash,
+        Data:            "RCUCOIN Blockchain ABCI",
+        LatestAppHash:   app.latestAppHash,
+        LastBlockHeight: 1,
     }
 }
 
-// Hantar hash terkini setiap kali blok selesai
-func (app *RcpuCoinApp) Commit() abci.ResponseCommit {
-    app.latestBlockHash = []byte(fmt.Sprintf("blockhash-%x", app.latestAppHash))
-    return abci.ResponseCommit{Data: app.latestBlockHash}
-}
-
-// Fungsi utama jalankan ABCI server
 func main() {
     app := NewRcpuCoinApp()
     srv := server.NewSocketServer(":26658", app)
 
     if err := srv.Start(); err != nil {
-        log.Fatalf("Failed to start ABCI server: %v", err)
+        log.Fatalf("Gagal mulakan ABCI server: %v", err)
     }
 
     defer srv.Stop()
-    log.Println("RCUCOIN ABCI server running on port 26658")
+    log.Println("ABCI server berjalan di port 26658")
     select {}
 }
