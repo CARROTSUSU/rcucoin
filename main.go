@@ -92,6 +92,11 @@ func (app *RcpuCoinApp) Info(req types.RequestInfo) types.ResponseInfo {
 func main() {
     app := NewRcpuCoinApp()
 
+// Set up your validators and their addresses
+validator1 := "ADDRESS1_HEX"
+validator2 := "ADDRESS2_HEX"
+
+// Other code to initialize and use the validators...
     srv := server.NewSocketServer(":26658", app)
 
     if err := srv.Start(); err != nil {
