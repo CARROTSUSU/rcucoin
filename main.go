@@ -25,8 +25,8 @@ func NewRcpuCoinApp() *RcpuCoinApp {
     }
 
     // Baki permulaan untuk dua alamat (anda boleh ganti dengan alamat sebenar)
-    app.balances["rcpuaddress1"] = 1000
-    app.balances["rcpuaddress2"] = 500
+    app.balances["rcpu9758A0E9A531642AE9E781BBDCE8F1298501BFFB"] = 1000
+    app.balances["rcpuFC8EA6FB4A04F93845D2F8E8E6ED63F698965499"] = 500
 
     return app
 }
